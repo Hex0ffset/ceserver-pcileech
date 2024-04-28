@@ -1,0 +1,268 @@
+version: 2.1
+executors:
+  windows:
+    machine:
+      image: windows-server-2022-gui:current
+    resource_class: windows.medium
+  ubuntu:
+    docker:
+      - image: cimg/base:current
+    resource_class: medium
+  arm:
+    docker:
+      - image: cimg/base:current
+    resource_class: medium
+jobs:
+  install-dependencies:
+    parameters:
+      os:
+        type: enum
+        enum: [ "windows", "ubuntu", "arm" ]
+    executor: << parameters.os >>
+    steps:
+      - run:
+          command: |
+            echo 'export CMAKE_VERSION=3.25.2' >> "$BASH_ENV"
+            echo 'export CMAKE_INSTALL_DIR="$HOME/cmake"' >> "$BASH_ENV"
+          name: Export env vars
+      - run:
+          command: mkdir -p $HOME/cmake
+          name: Create cmake install/cache dir
+      - restore_cache:
+          keys:
+            - &cmake_cache_key cmake-3.25.2-<< parameters.os >>-20240510
+      - run:
+          command: echo 'export PATH="$HOME/cmake/bin:$PATH"' >> $BASH_ENV
+          name: Add cmake to PATH
+      - when:
+          condition:
+            equal: ["windows", << parameters.os >>]
+          steps:
+            - run:
+                command: |
+                  #!/bin/bash
+                  
+                  if which cmake; then
+                    if cmake --version | grep "$CMAKE_VERSION"; then
+                      echo "CMake is already installed."
+                      exit 0
+                    else
+                      echo "CMake is already installed but it is the wrong version."
+                      cmake --version
+                    fi
+                  fi
+                  rm -rf "${CMAKE_INSTALL_DIR:?}/*"
+                  
+                  echo "Installing the requested version of CMake."
+                  baseUrl="https://github.com/Kitware/CMake/releases/download/"
+                  url="${baseUrl}/v$CMAKE_VERSION/cmake-$CMAKE_VERSION-windows-x86_64.zip"
+                  
+                  echo "Downloading from: $url"
+                  curl -sSL -o /tmp/cmake.zip "$url"
+                  tar -C "${CMAKE_INSTALL_DIR:?}" --strip-components 1 -zxf /tmp/cmake.zip
+                  
+                  # Remove unnecessary files
+                  rm -rf "${CMAKE_INSTALL_DIR:?}"/{doc,man}
+                name: Install CMake
+      - when:
+          condition:
+            equal: ["ubuntu", << parameters.os >>]
+          steps:
+            - run:
+                command: |-
+                  #!/bin/bash
+                  
+                  if which cmake; then
+                    if cmake --version | grep "$CMAKE_VERSION"; then
+                      echo "CMake is already installed."
+                      exit 0
+                    else
+                      echo "CMake is already installed but it is the wrong version."
+                      cmake --version
+                    fi
+                  fi
+                  rm -rf "${CMAKE_INSTALL_DIR:?}/*"
+                  
+                  echo "Installing the requested version of CMake."
+                  baseUrl="https://github.com/Kitware/CMake/releases/download/"
+                  url="${baseUrl}/v$CMAKE_VERSION/cmake-$CMAKE_VERSION-Linux-x86_64.tar.gz"
+                  
+                  echo "Downloading from: $url"
+                  curl -sSL -o /tmp/cmake.tar.gz "$url"
+                  tar -C "${CMAKE_INSTALL_DIR:?}" --strip-components 1 -zxf /tmp/cmake.tar.gz
+                  
+                  # Remove unnecessary files
+                  rm -rf "${CMAKE_INSTALL_DIR:?}"/{doc,man}
+                name: Install CMake
+      - when:
+          condition:
+            equal: ["arm", << parameters.os >>]
+          steps:
+            - run:
+                command: |-
+                  #!/bin/bash
+                  
+                  if which cmake; then
+                    if cmake --version | grep "$CMAKE_VERSION"; then
+                      echo "CMake is already installed."
+                      exit 0
+                    else
+                      echo "CMake is already installed but it is the wrong version."
+                      cmake --version || true
+                    fi
+                  fi
+                  rm -rf "${CMAKE_INSTALL_DIR:?}/*"
+                  
+                  echo "Installing the requested version of CMake."
+                  baseUrl="https://github.com/Kitware/CMake/releases/download/"
+                  url="${baseUrl}/v$CMAKE_VERSION/cmake-$CMAKE_VERSION.tar.gz"
+                  
+                  echo "Downloading from: $url"
+                  curl -sSL -o /tmp/cmake.tar.gz "$url"
+                  mkdir /tmp/cmake
+                  tar -C "/tmp/cmake" --strip-components 1 -zxf /tmp/cmake.tar.gz
+                  
+                  cd /tmp/cmake
+                  mkdir build
+                  cd build
+                  echo "Configuring CMake"
+                  /usr/bin/cmake .. -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_DIR:?}
+                  echo "Installing CMake"
+                  /usr/bin/cmake --build . --target install --config Release
+                  
+                  # Remove unnecessary files
+                  rm -rf "${CMAKE_INSTALL_DIR:?}"/{doc,man}
+                name: Install CMake
+      - save_cache:
+          key: *cmake_cache_key
+          paths:
+            - ~/cmake
+  build:
+    parameters:
+      os:
+        type: enum
+        enum: [ "windows", "ubuntu", "arm" ]
+      config:
+        type: enum
+        enum: [ "Debug", "Release" ]
+    executor: << parameters.os >>
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - *cmake_cache_key
+      - when:
+          condition:
+            or:
+              - equal: [ "ubuntu", << parameters.os >> ]
+              - equal: [ "arm", << parameters.os >> ]
+          steps:
+            - run:
+                name: Install dependencies (Ubuntu & ARM)
+                command: &aptinstalldeps sudo apt-get update && DEBIAN_FRONTEND=noninteractive sudo apt install -y libusb-1.0-0-dev libfuse-dev liblz4-dev
+      - run:
+          command: echo 'export PATH="$HOME/cmake/bin:$PATH"' >> $BASH_ENV
+          name: Add cmake to PATH
+      - run:
+          name: Create build dir
+          command: mkdir build-<< parameters.os >>-<< parameters.config >>
+      - when:
+          condition:
+            or:
+              - equal: [ "ubuntu", << parameters.os >> ]
+              - equal: [ "arm", << parameters.os >> ]
+          steps:
+            - run:
+                name: Configure CMake
+                working_directory: build-<< parameters.os >>-<< parameters.config >>
+                command: cmake ../ -DCMAKE_BUILD_TYPE=<< parameters.config >> -DCMAKE_INSTALL_PREFIX=/tmp/ceserver-pcileech
+      - when:
+          condition:
+            or:
+              - equal: [ "windows", << parameters.os >> ]
+          steps:
+            - run:
+                name: Configure CMake
+                working_directory: build-<< parameters.os >>-<< parameters.config >>
+                command: cmake ../ -DCMAKE_BUILD_TYPE=<< parameters.config >> -G "Visual Studio 17 2022" -Ax64 -DCMAKE_GENERATOR_PLATFORM=x64 -DCMAKE_INSTALL_PREFIX=c:/ceserver-pcileech
+      - run:
+          name: Build
+          working_directory: build-<< parameters.os >>-<< parameters.config >>
+          command:  cmake --build . --config << parameters.config >> --parallel --target install
+      - when:
+          condition:
+            or:
+              - equal: [ "ubuntu", << parameters.os >> ]
+              - equal: [ "arm", << parameters.os >> ]
+          steps:
+            - run:
+                name: Test installation
+                working_directory: /tmp/ceserver-pcileech
+                command: bin/ceserver-pcileech --version
+      - when:
+          condition:
+            or:
+              - equal: [ "windows", << parameters.os >> ]
+          steps:
+            - run:
+                name: Test installation
+                working_directory: C:/ceserver-pcileech/bin
+                command: ./ceserver-pcileech.exe --version
+      - persist_to_workspace:
+          root: .
+          paths: &builddir build-<< parameters.os >>-<< parameters.config >>
+  test:
+    parameters:
+      os:
+        type: enum
+        enum: [ "windows", "ubuntu", "arm" ]
+      config:
+        type: enum
+        enum: [ "Debug", "Release" ]
+    executor: << parameters.os >>
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - restore_cache:
+          keys:
+            - *cmake_cache_key
+      - when:
+          condition:
+            or:
+              - equal: [ "ubuntu", << parameters.os >> ]
+              - equal: [ "arm", << parameters.os >> ]
+          steps:
+            - run:
+                name: Install dependencies (Ubuntu & ARM)
+                command: *aptinstalldeps
+      - run:
+          command: echo 'export PATH="$HOME/cmake/bin:$PATH"' >> $BASH_ENV
+          name: Add cmake to PATH
+      - run:
+          name: Test
+          working_directory: *builddir
+          command: ctest -C << parameters.config >>
+      - store_artifacts:
+          path: build-<< parameters.os >>-<< parameters.config >>/Testing/Temporary/LastTest.log
+workflows:
+  build-install-and-test:
+    jobs:
+      - install-dependencies:
+          matrix:
+            parameters:
+              os: [ "windows", "ubuntu", "arm" ]
+      - build:
+          matrix:
+            parameters:
+              os: [ "windows", "ubuntu", "arm" ]
+              config: [ "Debug", "Release" ]
+          requires:
+            - install-dependencies
+      - test:
+          matrix:
+            parameters:
+              os: [ "windows", "ubuntu", "arm" ]
+              config: [ "Debug", "Release" ]
+          requires:
+            - build

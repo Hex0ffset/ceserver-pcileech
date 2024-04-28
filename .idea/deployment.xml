@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="PublishConfigData" remoteFilesAllowedToDisappearOnAutoupload="false" confirmBeforeDeletion="false">
+    <option name="confirmBeforeDeletion" value="false" />
+    <serverData>
+      <paths name="RPi5 (599f1fe2-a555-4670-b8bd-663efd5f2e3b)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/tmp/tmp.exqenMK0Kn" local="$PROJECT_DIR$" />
+          </mappings>
+          <excludedPaths>
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug-visual-studio-2022" />
+            <excludedPath local="true" path="$PROJECT_DIR$/build" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug-visual-studio-2022" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-release-rpi5" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug-rpi5" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug-rpi5" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug-rpi5-coverage" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-debug-rpi5-coverage" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-release-visual-studio-2022" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-release-rpi5" />
+            <excludedPath local="true" path="$PROJECT_DIR$/cmake-build-release-visual-studio-2022" />
+          </excludedPaths>
+        </serverdata>
+      </paths>
+    </serverData>
+  </component>
+</project>

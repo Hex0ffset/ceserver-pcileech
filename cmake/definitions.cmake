@@ -1,0 +1,11 @@
+if (WIN32)
+    add_definitions(-D_WIN32 -DWIN32_LEAN_AND_MEAN -DNOMINMAX)
+else()
+    add_definitions(-DLINUX)
+endif()
+
+if (${CMAKE_BUILD_TYPE} MATCHES "Debug")
+    add_definitions(-D_DEBUG)
+else()
+    add_definitions(-D_NDEBUG)
+endif()
